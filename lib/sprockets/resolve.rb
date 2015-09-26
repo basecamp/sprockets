@@ -62,43 +62,84 @@ module Sprockets
     end
 
     protected
+
+      # Internal: Finds an asset given a URI
+      #
+      # uri - String. Contains file:// scheme, absolute path to
+      #       file.
+      #       e.g. "file:///Users/schneems/sprockets/test/fixtures/default/gallery.js?type=application/javascript"
+      #
+      # Returns Array. Contains a String uri and Set of dependencies
       def resolve_asset_uri(uri)
-        filename, _ = parse_asset_uri(uri)
-        return uri, Set.new([build_file_digest_uri(filename)])
+        filename, _ = URIUtils.parse_asset_uri(uri)
+        return uri, Set.new( [URIUtils.build_file_digest_uri(filename)] )
       end
 
+      # Internal: Finds a file in a set of given paths
+      #
+      # paths    - Array of Strings.
+      # filename - String containing absolute path to a file including extension.
+      #            e.g. "/Users/schneems/sprockets/test/fixtures/asset/application.js"
+      # accept   - String. A Quality value incoded set of
+      #            mime types that we are looking for. Can be nil.
+      #            e.g. "application/javascript" or "text/css, */*"
+      #
+      # Returns Array. Filename, type, path_pipeline, deps, index_alias
       def resolve_absolute_path(paths, filename, accept)
         deps = Set.new
         filename = File.expand_path(filename)
 
         # Ensure path is under load paths
-        return nil, nil, deps unless paths_split(paths, filename)
+        return nil, nil, deps unless PathUtils.paths_split(paths, filename)
 
-        _, mime_type = match_path_extname(filename, config[:mime_exts])
+        _, mime_type = PathUtils.match_path_extname(filename, config[:mime_exts])
         type = resolve_transform_type(mime_type, accept)
         return nil, nil, deps if accept && !type
 
         return nil, nil, deps unless file?(filename)
 
-        deps << build_file_digest_uri(filename)
+        deps << URIUtils.build_file_digest_uri(filename)
         return filename, type, deps
       end
 
+      # Internal: Finds a relative file in a set of given paths
+      #
+      # paths   - Array of Strings.
+      # path    - String. A relative filename with or without extension
+      #           e.g. "./jquery" or "../foo.js"
+      # dirname - String. Base path where we start looking for the given file.
+      # accept  - String. A Quality value incoded set of
+      #           mime types that we are looking for. Can be nil.
+      #           e.g. "application/javascript" or "text/css, */*"
+      #
+      # Returns Array. Filename, type, path_pipeline, deps, index_alias
       def resolve_relative_path(paths, path, dirname, accept)
         filename = File.expand_path(path, dirname)
-        load_path, _ = paths_split(paths, dirname)
-        if load_path && logical_path = split_subpath(load_path, filename)
+        load_path, _ = PathUtils.paths_split(paths, dirname)
+        if load_path && logical_path = PathUtils.split_subpath(load_path, filename)
           resolve_logical_path([load_path], logical_path, accept)
         else
           return nil, nil, nil, Set.new
         end
       end
 
+      # Internal: Finds a file in a set of given paths
+      #
+      # paths        - Array of Strings.
+      # logical_path - String. A filename with extension
+      #                e.g. "coffee/foo.js" or "foo.js"
+      # accept       - String. A Quality value incoded set of
+      #                mime types that we are looking for. Can be nil.
+      #                e.g. "application/javascript" or "text/css, */*"
+      #
+      # Finds a file on the given paths.
+      #
+      # Returns Array. Filename, type, path_pipeline, deps, index_alias
       def resolve_logical_path(paths, logical_path, accept)
-        extname, mime_type = match_path_extname(logical_path, config[:mime_exts])
+        extname, mime_type = PathUtils.match_path_extname(logical_path, config[:mime_exts])
         logical_name = logical_path.chomp(extname)
 
-        extname, pipeline = match_path_extname(logical_name, config[:pipeline_exts])
+        extname, pipeline = PathUtils.match_path_extname(logical_name, config[:pipeline_exts])
         logical_name = logical_name.chomp(extname)
 
         parsed_accept = parse_accept_options(mime_type, accept)
